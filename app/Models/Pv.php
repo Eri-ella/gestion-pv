@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Pv extends Model
@@ -17,6 +18,22 @@ class Pv extends Model
             'date_deliberation' => 'date',
             'date_validation' => 'datetime',
         ];
+    }
+
+    public function scopeVisiblePar(Builder $query, User $user): Builder
+    {
+        if ($user->isRole('administrateur', 'agent_scolarite')) {
+            return $query;
+        }
+
+        if (! $user->isRole('chef_departement') || ! $user->departement_id) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas(
+            'promotion.filiere',
+            fn (Builder $filieres) => $filieres->where('departement_id', $user->departement_id),
+        );
     }
 
     public function promotion()
