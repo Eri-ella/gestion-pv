@@ -30,6 +30,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function aRole(string ...$roles): bool
+    {
+        return $this->isRole(...$roles);
+    }
+
     public function role()
     {
         return $this->belongsTo(Role::class);

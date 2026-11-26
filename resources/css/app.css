@@ -1,1 +1,29 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+
+    /* ===== COULEURS ENEAM : à modifier uniquement ici (hex) ===== */
+    --color-primary: #006b3f;   /* vert  : couleur principale */
+    --color-secondary: #fcd116; /* jaune : accents / badges   */
+    --color-danger: #d81830;    /* rouge : erreurs            */
+    --color-info: #1d4ed8;      /* bleu  : liens / infos      */
+
+    --color-page: #f6f8f7;      /* fond de page  */
+    --color-surface: #ffffff;   /* cartes        */
+    --color-ink: #111827;       /* texte         */
+    --color-muted: #6b7280;     /* texte discret */
+    --color-line: #e5e7eb;      /* bordures      */
+
+    /* Les anciennes vues utilisent encore "indigo-*" : on les redirige vers la couleur principale */
+    --color-indigo-50: color-mix(in oklab, var(--color-primary) 8%, white);
+    --color-indigo-100: color-mix(in oklab, var(--color-primary) 15%, white);
+    --color-indigo-500: var(--color-primary);
+    --color-indigo-600: var(--color-primary);
+    --color-indigo-700: color-mix(in oklab, var(--color-primary) 85%, black);
+}
+
 [x-cloak] { display: none !important; }
