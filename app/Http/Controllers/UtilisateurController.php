@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Departement;
-use App\Models\EvenementJournal;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Journal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -45,13 +45,7 @@ class UtilisateurController extends Controller
         $data['actif'] = true;
         $user = User::create($data);
 
-        EvenementJournal::create([
-            'user_id' => $request->user()->id,
-            'action' => 'user.created',
-            'cible' => $user->email,
-            'details' => 'Compte utilisateur créé',
-            'ip' => $request->ip(),
-        ]);
+        Journal::enregistrer('user.created', $user->email, 'Compte utilisateur créé.');
 
         return back()->with('success', 'Utilisateur créé.');
     }
@@ -61,13 +55,11 @@ class UtilisateurController extends Controller
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas désactiver votre propre compte.');
         $user->update(['actif' => ! $user->actif]);
 
-        EvenementJournal::create([
-            'user_id' => $request->user()->id,
-            'action' => $user->actif ? 'user.enabled' : 'user.disabled',
-            'cible' => $user->email,
-            'details' => 'Statut du compte modifié',
-            'ip' => $request->ip(),
-        ]);
+        Journal::enregistrer(
+            $user->actif ? 'user.enabled' : 'user.disabled',
+            $user->email,
+            'Statut du compte modifié.',
+        );
 
         return back()->with('success', 'Statut utilisateur modifié.');
     }
