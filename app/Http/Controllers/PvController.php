@@ -96,21 +96,21 @@ class PvController extends Controller
             'promotion_id' => ['required', 'exists:promotions,id', 'unique:pvs,promotion_id'],
             'reference' => ['required', 'string', 'max:255', 'unique:pvs,reference'],
             'date_deliberation' => ['nullable', 'date'],
-            'president_jury' => ['nullable', 'string', 'max:255'],
+            ...$this->reglesMembres(),
             'fichier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
-            'membres' => ['nullable', 'array'],
-            'membres.*.nom' => ['required_with:membres', 'string', 'max:255'],
-            'membres.*.fonction' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $membres = $data['membres'] ?? [];
-        unset($data['fichier'], $data['membres']);
+        $membres = $data['membres'];
+        $presidentIndex = isset($data['president_index']) ? (int) $data['president_index'] : null;
+
+        $data['fichier_path'] = $this->storePrivateFile($request);
+        unset($data['fichier'], $data['membres'], $data['president_index']);
         $data['cree_par'] = $user->id;
         $data['statut'] = 'brouillon';
 
-        $pv = DB::transaction(function () use ($data, $membres) {
+        $pv = DB::transaction(function () use ($data, $membres, $presidentIndex) {
             $pv = Pv::create($data);
-            $this->syncMembres($pv, $membres);
+            $this->syncMembres($pv, $membres, $presidentIndex);
 
             return $pv;
         });
@@ -154,12 +154,12 @@ class PvController extends Controller
             ],
             'reference' => ['required', 'string', 'max:255', Rule::unique('pvs', 'reference')->ignore($pv->id)],
             'date_deliberation' => ['nullable', 'date'],
-            'president_jury' => ['nullable', 'string', 'max:255'],
+            ...$this->reglesMembres(),
             'fichier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
-            'membres' => ['nullable', 'array'],
-            'membres.*.nom' => ['required_with:membres', 'string', 'max:255'],
-            'membres.*.fonction' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $membres = $data['membres'];
+        $presidentIndex = isset($data['president_index']) ? (int) $data['president_index'] : null;
 
         abort_if(
             (int) $data['promotion_id'] !== (int) $pv->promotion_id && $pv->resultats()->exists(),
@@ -173,12 +173,10 @@ class PvController extends Controller
             $data['fichier_path'] = $newFilePath;
         }
 
-        $membres = $data['membres'] ?? [];
-        unset($data['fichier'], $data['membres']);
-
-        DB::transaction(function () use ($pv, $data, $membres) {
+        unset($data['fichier'], $data['membres'], $data['president_index']);
+        DB::transaction(function () use ($pv, $data, $membres, $presidentIndex) {
             $pv->update($data);
-            $this->syncMembres($pv, $membres);
+            $this->syncMembres($pv, $membres, $presidentIndex);
         });
 
         if ($newFilePath !== null && $oldFilePath !== null) {
@@ -440,6 +438,42 @@ class PvController extends Controller
         return back()->with('success', 'Résultats enregistrés.');
     }
 
+    private function reglesMembres(): array
+    {
+        return [
+            'membres' => ['required', 'array', 'min:1'],
+            'membres.*.nom' => ['required', 'string', 'max:255'],
+            'membres.*.fonction' => ['nullable', 'string', 'max:255'],
+            'president_index' => ['nullable', 'integer', 'min:0'],
+        ];
+    }
+
+    /**
+     * Remplace les membres du jury du PV ; le président du jury est déduit du membre coché.
+     */
+    private function syncMembres(Pv $pv, array $membres, ?int $presidentIndex): void
+    {
+        $pv->membres()->delete();
+
+        $president = null;
+        foreach (array_values($membres) as $i => $membre) {
+            $estPresident = $presidentIndex === $i;
+            $nom = trim($membre['nom']);
+
+            $pv->membres()->create([
+                'nom' => $nom,
+                'fonction' => filled($membre['fonction'] ?? null) ? trim($membre['fonction']) : null,
+                'president' => $estPresident,
+            ]);
+
+            if ($estPresident) {
+                $president = $nom;
+            }
+        }
+
+        $pv->update(['president_jury' => $president]);
+    }
+
     private function authenticatedUser(Request $request): User
     {
         $user = $request->user();
@@ -488,22 +522,5 @@ class PvController extends Controller
         abort_unless(is_string($path), 500, 'Le fichier du PV n’a pas pu être enregistré.');
 
         return $path;
-    }
-
-    private function syncMembres(Pv $pv, array $membres): void
-    {
-        $pv->membres()->delete();
-
-        foreach ($membres as $membre) {
-            if (trim((string) ($membre['nom'] ?? '')) === '') {
-                continue;
-            }
-
-            $pv->membres()->create([
-                'nom' => trim($membre['nom']),
-                'fonction' => trim((string) ($membre['fonction'] ?? '')) ?: null,
-                'president' => false,
-            ]);
-        }
     }
 }

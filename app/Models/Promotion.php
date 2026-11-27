@@ -2,11 +2,21 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class Promotion extends Model
 {
     protected $fillable = ['annee_universitaire_id', 'filiere_id', 'niveau_id'];
+
+    protected function libelle(): Attribute
+    {
+        return Attribute::get(fn () => implode(' · ', array_filter([
+            $this->filiere?->code,
+            $this->niveau?->libelle,
+            $this->annee?->libelle,
+        ])));
+    }
 
     public function annee()
     {

@@ -1,54 +1,73 @@
 <x-app-layout>
-    <x-slot:header>Journal d'activité</x-slot:header>
+    <x-slot name="header">Référentiels</x-slot>
 
-    <form method="GET" class="card grid items-end gap-3 sm:grid-cols-3">
-        <div>
-            <x-input-label for="action" value="Action" />
-            <select id="action" name="action" class="input">
-                <option value="">Toutes</option>
-                @foreach ($actions as $a)
-                    <option value="{{ $a }}" @selected($action === $a)>{{ $a }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div>
-            <x-input-label for="date" value="Date" />
-            <x-text-input id="date" type="date" name="date" :value="$date" />
-        </div>
-        <div class="flex gap-2">
-            <x-btn>Filtrer</x-btn>
-            <x-btn variant="secondary" :href="route('journal.index')">Réinitialiser</x-btn>
-        </div>
-    </form>
+    @php
+        $types = [
+            'annees' => ['Années académiques', $annees, [['libelle', 'Libellé (2025-2026)', 'text'], ['date_debut', 'Début', 'date'], ['date_fin', 'Fin', 'date']]],
+            'filieres' => ['Filières', $filieres, [['code', 'Code', 'text'], ['libelle', 'Libellé', 'text']]],
+            'niveaux' => ['Niveaux', $niveaux, [['code', 'Code (L1, M2…)', 'text'], ['libelle', 'Libellé', 'text']]],
+            'semestres' => ['Semestres', $semestres, [['code', 'Code (S1…)', 'text'], ['libelle', 'Libellé', 'text']]],
+        ];
+    @endphp
 
-    <div class="card mt-6 overflow-x-auto p-0">
-        <table class="min-w-full text-sm">
-            <thead class="bg-slate-50">
-                <tr>
-                    <th class="th">Date</th>
-                    <th class="th">Utilisateur</th>
-                    <th class="th">Action</th>
-                    <th class="th">Cible</th>
-                    <th class="th">Détails</th>
-                    <th class="th">IP</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                @forelse ($evenements as $ev)
-                    <tr class="hover:bg-slate-50">
-                        <td class="td whitespace-nowrap">{{ $ev->created_at->format('d/m/Y H:i') }}</td>
-                        <td class="td">{{ $ev->user?->name ?? '—' }}</td>
-                        <td class="td"><span class="rounded bg-info-soft px-2 py-0.5 text-xs font-medium text-info">{{ $ev->action }}</span></td>
-                        <td class="td">{{ $ev->cible ?? '—' }}</td>
-                        <td class="td text-slate-600">{{ $ev->details ?? '—' }}</td>
-                        <td class="td font-mono text-xs">{{ $ev->ip ?? '—' }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="6" class="px-4 py-10 text-center text-slate-500">Aucun événement.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
+    <div x-data="{ tab: '{{ array_key_first($types) }}' }">
+        <div class="mb-6 flex flex-wrap gap-2 border-b border-slate-200">
+            @foreach ($types as $key => [$titre])
+                <button type="button" @click="tab = '{{ $key }}'"
+                    :class="tab === '{{ $key }}' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="-mb-px border-b-2 px-4 py-2 text-sm font-medium">{{ $titre }}</button>
+            @endforeach
+        </div>
+
+        @foreach ($types as $key => [$titre, $items, $champs])
+            <div x-show="tab === '{{ $key }}'" x-cloak class="grid gap-6 lg:grid-cols-3">
+                <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white lg:col-span-2">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                            <tr>
+                                @foreach ($champs as $c)
+                                <th class="px-4 py-3">{{ $c[1] }}</th> @endforeach
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse ($items as $item)
+                                <tr>
+                                    @foreach ($champs as $c)
+                                        @php $v = $item->{$c[0]}; @endphp
+                                        <td class="px-4 py-2">{{ $v instanceof \Carbon\Carbon ? $v->format('d/m/Y') : $v }}</td>
+                                    @endforeach
+                                    <td class="px-4 py-2 text-right">
+                                        <form method="POST" action="{{ route('referentiels.destroy', [$key, $item->id]) }}"
+                                            onsubmit="return confirm('Supprimer cet élément ?')">
+                                            @csrf @method('DELETE')
+                                            <button class="text-red-600 hover:underline">Supprimer</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="{{ count($champs) + 1 }}" class="px-4 py-8 text-center text-slate-500">Aucun
+                                        élément.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <form method="POST" action="{{ route('referentiels.store', $key) }}"
+                    class="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+                    @csrf
+                    <h2 class="font-semibold">Ajouter</h2>
+                    @foreach ($champs as [$name, $label, $type])
+                        <div>
+                            <x-input-label :for="$key . '_' . $name" :value="$label" />
+                            <x-text-input :id="$key . '_' . $name" :type="$type" :name="$name" class="mt-1 w-full" required />
+                        </div>
+                    @endforeach
+                    <x-btn>Enregistrer</x-btn>
+                </form>
+            </div>
+        @endforeach
     </div>
-
-    <div class="mt-4">{{ $evenements->links() }}</div>
 </x-app-layout>

@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Etudiant;
-use App\Models\Filiere;
+use App\Models\Promotion;
 use App\Models\Pv;
+use App\Models\Resultat;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -16,48 +17,59 @@ class DashboardController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 403);
 
-        $pvTotal = Pv::visiblePar($user)->count();
-        $pvNumerises = Pv::visiblePar($user)->whereNotNull('fichier_path')->count();
-        $pvValides = Pv::visiblePar($user)->where('statut', 'valide')->count();
+        $pvs = fn () => Pv::visiblePar($user);
+        $promotions = fn () => Promotion::query()->when(
+            ! $user->isRole('administrateur', 'agent_scolarite'),
+            fn (Builder $query) => $query->whereHas(
+                'filiere',
+                fn (Builder $filieres) => $filieres->where('departement_id', $user->departement_id),
+            ),
+        );
 
-        $tauxParFiliere = Filiere::query()
-            ->whereHas('promotions.pv', fn (Builder $query) => $query->visiblePar($user))
-            ->withCount([
-                'promotions as pv_total' => fn (Builder $query) => $query->whereHas(
-                    'pv',
-                    fn (Builder $pvs) => $pvs->visiblePar($user),
-                ),
-                'promotions as pv_valides' => fn (Builder $query) => $query->whereHas(
-                    'pv',
-                    fn (Builder $pvs) => $pvs->visiblePar($user)->where('statut', 'valide'),
-                ),
-            ])
-            ->orderBy('libelle')
-            ->get()
-            ->map(fn (Filiere $filiere) => [
-                'filiere' => $filiere->libelle,
-                'annee' => '',
-                'taux' => $filiere->pv_total > 0
-                    ? round(($filiere->pv_valides / $filiere->pv_total) * 100, 1)
-                    : 0,
-            ]);
+        // Taux de réussite (admis / résultats avec décision) par filière et par année
+        $lignes = Resultat::query()
+            ->join('pvs', 'pvs.id', '=', 'resultats.pv_id')
+            ->join('promotions', 'promotions.id', '=', 'pvs.promotion_id')
+            ->join('filieres', 'filieres.id', '=', 'promotions.filiere_id')
+            ->join('annee_universitaires', 'annee_universitaires.id', '=', 'promotions.annee_universitaire_id')
+            ->whereIn('resultats.pv_id', $pvs()->select('pvs.id'))
+            ->whereNotNull('resultats.decision')
+            ->groupBy('filieres.code', 'annee_universitaires.libelle')
+            ->orderBy('annee_universitaires.libelle')
+            ->orderBy('filieres.code')
+            ->selectRaw("filieres.code as filiere, annee_universitaires.libelle as annee, count(*) as total, sum(case when resultats.decision = 'admis' then 1 else 0 end) as admis")
+            ->get();
+
+        $filieres = $lignes->pluck('filiere')->unique()->values();
+        $datasets = $lignes->pluck('annee')->unique()->values()->map(fn ($annee) => [
+            'label' => $annee,
+            'data' => $filieres->map(function ($filiere) use ($lignes, $annee) {
+                $ligne = $lignes->first(fn ($l) => $l->annee === $annee && $l->filiere === $filiere);
+
+                return $ligne ? round($ligne->admis / $ligne->total * 100, 1) : null;
+            })->all(),
+        ])->all();
+
+        $totalResultats = $lignes->sum('total');
+        $numerises = $pvs()->whereNotNull('fichier_path')->count();
+        $attendus = $promotions()->count();
 
         return view('dashboard', [
             'stats' => [
-                'pv_numerises' => $pvNumerises,
-                'pv_attendus' => max(0, $pvTotal - $pvNumerises),
-                'pv_total' => $pvTotal,
+                'pv_numerises' => $numerises,
+                'pv_attendus' => $attendus,
+                'pv_valides' => $pvs()->whereIn('statut', ['valide', 'archive'])->count(),
                 'etudiants' => Etudiant::whereHas(
                     'resultats.pv',
                     fn (Builder $query) => $query->visiblePar($user),
-                )->distinct()->count('etudiants.id'),
-                'taux_global' => $pvTotal > 0 ? round(($pvValides / $pvTotal) * 100, 1) : 0,
+                )->count(),
+                'taux_global' => $totalResultats > 0 ? round($lignes->sum('admis') / $totalResultats * 100, 1) : 0,
             ],
-            'tauxParFiliere' => $tauxParFiliere,
-            'pvManquants' => Pv::visiblePar($user)->doesntHave('resultats')
-                ->with(['promotion.annee', 'promotion.filiere', 'promotion.niveau', 'membres', 'resultats.etudiant', 'validateur'])
-                ->limit(10)->get()
-                ->map(fn ($pv) => ['id' => $pv->id, 'libelle' => $pv->reference]),
+            'chartTaux' => ['labels' => $filieres->all(), 'datasets' => $datasets],
+            'derniersPv' => $pvs()->with(['promotion.filiere', 'promotion.niveau', 'promotion.annee'])
+                ->latest()->limit(6)->get(),
+            'pvManquants' => $promotions()->doesntHave('pv')
+                ->with(['annee', 'filiere', 'niveau'])->limit(8)->get(),
         ]);
     }
 }
