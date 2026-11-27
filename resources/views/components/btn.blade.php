@@ -1,13 +1,13 @@
 @props(['variant' => 'primary', 'href' => null])
 @php
     $c = [
-        'primary' => 'bg-indigo-600 text-white hover:bg-indigo-700',
+        'primary' => 'bg-primary text-white hover:bg-primary-dark',
         'secondary' => 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-        'danger' => 'bg-red-600 text-white hover:bg-red-700',
+        'accent' => 'bg-accent text-slate-900 hover:opacity-90',
+        'danger' => 'bg-danger text-white hover:opacity-90',
     ][$variant];
-    $class = "inline-flex items-center rounded-md px-3.5 py-2 text-sm font-medium transition $c";
+    $class = "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition $c";
 @endphp
-
 @if ($href)
     <a href="{{ $href }}" {{ $attributes->merge(['class' => $class]) }}>{{ $slot }}</a>
 @else

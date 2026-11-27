@@ -4,37 +4,44 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Connexion · ENEAM</title>
-    <link rel="icon" href="{{ asset('images/logo-eneam.png') }}">
+    <title>Connexion · {{ config('app.name', 'Gestion des PV') }}</title>
+    @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="grid min-h-screen place-items-center bg-gradient-to-br from-primary/10 via-page to-secondary/20 p-4 font-sans text-ink antialiased">
-    <form method="POST" action="{{ url('/login') }}" class="w-full max-w-sm space-y-4 rounded-2xl border border-line bg-surface p-8 shadow-lg">
-        @csrf
-        <img src="{{ asset('images/logo-eneam.png') }}" alt="ENEAM" class="mx-auto h-20">
-        <div class="text-center">
-            <h1 class="text-xl font-semibold">Gestion des PV</h1>
-            <p class="text-sm text-muted">Connectez-vous à votre espace</p>
+<body class="bg-slate-100 font-sans text-slate-800 antialiased">
+    <div class="flex min-h-screen items-center justify-center p-4">
+        <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div class="flex h-1.5"><span class="flex-1 bg-primary"></span><span class="flex-1 bg-accent"></span><span class="flex-1 bg-danger"></span><span class="flex-1 bg-info"></span></div>
+            <div class="p-8">
+                <div class="text-center">
+                    @if (file_exists(public_path('images/logo-eneam.png')))
+                        <img src="{{ asset('images/logo-eneam.png') }}" alt="ENEAM" class="mx-auto mb-3 h-16">
+                    @endif
+                    <h1 class="text-2xl font-bold text-primary-dark">ENEAM</h1>
+                    <p class="text-sm text-slate-500">Gestion des procès-verbaux de délibération</p>
+                </div>
+
+                <form method="POST" action="{{ url('/login') }}" class="mt-8 space-y-4">
+                    @csrf
+                    <div>
+                        <x-input-label for="email" value="Adresse e-mail" />
+                        <x-text-input id="email" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
+                        <x-input-error :messages="$errors->get('email')" />
+                    </div>
+                    <div>
+                        <x-input-label for="password" value="Mot de passe" />
+                        <x-text-input id="password" type="password" name="password" required autocomplete="current-password" />
+                        <x-input-error :messages="$errors->get('password')" />
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-slate-600">
+                        <input type="checkbox" name="remember" class="rounded border-slate-300 text-primary focus:ring-primary"> Se souvenir de moi
+                    </label>
+                    <x-btn class="w-full">Se connecter</x-btn>
+                </form>
+            </div>
         </div>
-
-        @if ($errors->any())
-            <div class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">{{ $errors->first() }}</div>
-        @endif
-
-        <label class="block text-sm font-medium">Email
-            <input type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username"
-                class="mt-1 w-full rounded-lg border border-line bg-page px-3 py-2 text-sm focus:border-primary focus:outline-none">
-        </label>
-        <label class="block text-sm font-medium">Mot de passe
-            <input type="password" name="password" required autocomplete="current-password"
-                class="mt-1 w-full rounded-lg border border-line bg-page px-3 py-2 text-sm focus:border-primary focus:outline-none">
-        </label>
-        <label class="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" name="remember" class="rounded border-line text-primary"> Se souvenir de moi
-        </label>
-        <button class="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:opacity-90">Se connecter</button>
-    </form>
+    </div>
 </body>
 
 </html>

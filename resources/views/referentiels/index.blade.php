@@ -1,68 +1,87 @@
 <x-app-layout>
-    <x-slot name="header">Référentiels</x-slot>
+    <x-slot:header>Référentiels</x-slot:header>
 
     @php
         $types = [
-            'annees' => ['Années académiques', $annees, [['libelle', 'Libellé (2025-2026)', 'text'], ['date_debut', 'Début', 'date'], ['date_fin', 'Fin', 'date']]],
-            'filieres' => ['Filières', $filieres, [['code', 'Code', 'text'], ['libelle', 'Libellé', 'text']]],
-            'niveaux' => ['Niveaux', $niveaux, [['code', 'Code (L1, M2…)', 'text'], ['libelle', 'Libellé', 'text']]],
-            'semestres' => ['Semestres', $semestres, [['code', 'Code (S1…)', 'text'], ['libelle', 'Libellé', 'text']]],
+            'annees' => [
+                'titre' => 'Années', 'items' => $annees, 'cols' => ['Libellé', 'Courante'],
+                'row' => fn ($i) => [$i->libelle, $i->courante ? 'Oui' : 'Non'],
+                'fields' => [['libelle', 'Libellé (ex : 2025-2026)', 'text'], ['courante', 'Année courante', 'checkbox']],
+            ],
+            'departements' => [
+                'titre' => 'Départements', 'items' => $departements, 'cols' => ['Code', 'Libellé'],
+                'row' => fn ($i) => [$i->code, $i->libelle],
+                'fields' => [['code', 'Code', 'text'], ['libelle', 'Libellé', 'text']],
+            ],
+            'filieres' => [
+                'titre' => 'Filières', 'items' => $filieres, 'cols' => ['Code', 'Libellé', 'Département'],
+                'row' => fn ($i) => [$i->code, $i->libelle, $i->departement?->code],
+                'fields' => [['departement_id', 'Département', 'select'], ['code', 'Code', 'text'], ['libelle', 'Libellé', 'text']],
+            ],
+            'niveaux' => [
+                'titre' => 'Niveaux', 'items' => $niveaux, 'cols' => ['Ordre', 'Libellé'],
+                'row' => fn ($i) => [$i->ordre, $i->libelle],
+                'fields' => [['libelle', 'Libellé (ex : Licence 1)', 'text'], ['ordre', 'Ordre', 'number']],
+            ],
         ];
     @endphp
 
     <div x-data="{ tab: '{{ array_key_first($types) }}' }">
         <div class="mb-6 flex flex-wrap gap-2 border-b border-slate-200">
-            @foreach ($types as $key => [$titre])
+            @foreach ($types as $key => $t)
                 <button type="button" @click="tab = '{{ $key }}'"
-                    :class="tab === '{{ $key }}' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                    class="-mb-px border-b-2 px-4 py-2 text-sm font-medium">{{ $titre }}</button>
+                    :class="tab === '{{ $key }}' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="-mb-px border-b-2 px-4 py-2 text-sm font-medium">{{ $t['titre'] }}</button>
             @endforeach
         </div>
 
-        @foreach ($types as $key => [$titre, $items, $champs])
+        @foreach ($types as $key => $t)
             <div x-show="tab === '{{ $key }}'" x-cloak class="grid gap-6 lg:grid-cols-3">
-                <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white lg:col-span-2">
+                <div class="card overflow-x-auto p-0 lg:col-span-2">
                     <table class="min-w-full text-sm">
-                        <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                        <thead class="bg-slate-50">
                             <tr>
-                                @foreach ($champs as $c)
-                                <th class="px-4 py-3">{{ $c[1] }}</th> @endforeach
-                                <th class="px-4 py-3"></th>
+                                @foreach ($t['cols'] as $c)<th class="th">{{ $c }}</th>@endforeach
+                                <th class="th"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            @forelse ($items as $item)
+                            @forelse ($t['items'] as $item)
                                 <tr>
-                                    @foreach ($champs as $c)
-                                        @php $v = $item->{$c[0]}; @endphp
-                                        <td class="px-4 py-2">{{ $v instanceof \Carbon\Carbon ? $v->format('d/m/Y') : $v }}</td>
-                                    @endforeach
-                                    <td class="px-4 py-2 text-right">
-                                        <form method="POST" action="{{ route('referentiels.destroy', [$key, $item->id]) }}"
-                                            onsubmit="return confirm('Supprimer cet élément ?')">
+                                    @foreach ($t['row']($item) as $cell)<td class="td">{{ $cell }}</td>@endforeach
+                                    <td class="td text-right">
+                                        <form method="POST" action="{{ route('referentiels.destroy', [$key, $item->id]) }}" onsubmit="return confirm('Supprimer cet élément ?')">
                                             @csrf @method('DELETE')
-                                            <button class="text-red-600 hover:underline">Supprimer</button>
+                                            <button class="text-sm font-medium text-danger hover:underline">Supprimer</button>
                                         </form>
                                     </td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="{{ count($champs) + 1 }}" class="px-4 py-8 text-center text-slate-500">Aucun
-                                        élément.</td>
-                                </tr>
+                                <tr><td colspan="{{ count($t['cols']) + 1 }}" class="px-4 py-8 text-center text-slate-500">Aucun élément.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                <form method="POST" action="{{ route('referentiels.store', $key) }}"
-                    class="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+                <form method="POST" action="{{ route('referentiels.store', $key) }}" class="card space-y-3">
                     @csrf
                     <h2 class="font-semibold">Ajouter</h2>
-                    @foreach ($champs as [$name, $label, $type])
+                    @foreach ($t['fields'] as [$name, $label, $type])
                         <div>
-                            <x-input-label :for="$key . '_' . $name" :value="$label" />
-                            <x-text-input :id="$key . '_' . $name" :type="$type" :name="$name" class="mt-1 w-full" required />
+                            @if ($type === 'checkbox')
+                                <label class="flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="checkbox" name="{{ $name }}" value="1" class="rounded border-slate-300 text-primary focus:ring-primary"> {{ $label }}
+                                </label>
+                            @elseif ($type === 'select')
+                                <x-input-label :for="$key.'_'.$name" :value="$label" />
+                                <select id="{{ $key.'_'.$name }}" name="{{ $name }}" class="input" required>
+                                    <option value="">Choisir…</option>
+                                    @foreach ($departements as $d)<option value="{{ $d->id }}">{{ $d->code }} — {{ $d->libelle }}</option>@endforeach
+                                </select>
+                            @else
+                                <x-input-label :for="$key.'_'.$name" :value="$label" />
+                                <x-text-input :id="$key.'_'.$name" :type="$type" :name="$name" required />
+                            @endif
                         </div>
                     @endforeach
                     <x-btn>Enregistrer</x-btn>

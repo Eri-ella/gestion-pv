@@ -98,14 +98,22 @@ class PvController extends Controller
             'date_deliberation' => ['nullable', 'date'],
             'president_jury' => ['nullable', 'string', 'max:255'],
             'fichier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'membres' => ['nullable', 'array'],
+            'membres.*.nom' => ['required_with:membres', 'string', 'max:255'],
+            'membres.*.fonction' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $data['fichier_path'] = $this->storePrivateFile($request);
-        unset($data['fichier']);
+        $membres = $data['membres'] ?? [];
+        unset($data['fichier'], $data['membres']);
         $data['cree_par'] = $user->id;
         $data['statut'] = 'brouillon';
 
-        $pv = Pv::create($data);
+        $pv = DB::transaction(function () use ($data, $membres) {
+            $pv = Pv::create($data);
+            $this->syncMembres($pv, $membres);
+
+            return $pv;
+        });
         Journal::enregistrer('pv.created', $pv->reference, $request->method().' '.$request->path());
 
         return redirect()->route('pvs.show', $pv)->with('success', 'PV créé avec succès.');
@@ -148,6 +156,9 @@ class PvController extends Controller
             'date_deliberation' => ['nullable', 'date'],
             'president_jury' => ['nullable', 'string', 'max:255'],
             'fichier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'membres' => ['nullable', 'array'],
+            'membres.*.nom' => ['required_with:membres', 'string', 'max:255'],
+            'membres.*.fonction' => ['nullable', 'string', 'max:255'],
         ]);
 
         abort_if(
@@ -162,8 +173,13 @@ class PvController extends Controller
             $data['fichier_path'] = $newFilePath;
         }
 
-        unset($data['fichier']);
-        $pv->update($data);
+        $membres = $data['membres'] ?? [];
+        unset($data['fichier'], $data['membres']);
+
+        DB::transaction(function () use ($pv, $data, $membres) {
+            $pv->update($data);
+            $this->syncMembres($pv, $membres);
+        });
 
         if ($newFilePath !== null && $oldFilePath !== null) {
             Storage::disk('local')->delete($oldFilePath);
@@ -472,5 +488,22 @@ class PvController extends Controller
         abort_unless(is_string($path), 500, 'Le fichier du PV n’a pas pu être enregistré.');
 
         return $path;
+    }
+
+    private function syncMembres(Pv $pv, array $membres): void
+    {
+        $pv->membres()->delete();
+
+        foreach ($membres as $membre) {
+            if (trim((string) ($membre['nom'] ?? '')) === '') {
+                continue;
+            }
+
+            $pv->membres()->create([
+                'nom' => trim($membre['nom']),
+                'fonction' => trim((string) ($membre['fonction'] ?? '')) ?: null,
+                'president' => false,
+            ]);
+        }
     }
 }

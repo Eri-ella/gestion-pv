@@ -1,15 +1,16 @@
 @php
     $u = auth()->user();
-    // [libellé, route, motif de route actif, rôles autorisés (null = tous), icône]
+    // [libellé, route, motifs d'activation, icône (path SVG), rôles autorisés (null = tous), groupe]
     $menu = [
-        ['Tableau de bord', 'dashboard', 'dashboard', null, 'M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'],
-        ['Procès-verbaux', 'pvs.index', 'pvs.*', null, 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z'],
-        ['Étudiants', 'etudiants.index', 'etudiants.*', null, 'M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342'],
-        ['Référentiels', 'referentiels.index', 'referentiels.*', ['administrateur'], 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25'],
-        ['Journal', 'journal.index', 'journal.*', ['administrateur'], 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'],
-        ['Utilisateurs', 'utilisateurs.index', 'utilisateurs.*', ['administrateur'], 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z'],
+        ['Tableau de bord', 'dashboard', 'dashboard', 'M4 13h6V4H4zM14 20h6V11h-6zM4 20h6v-4H4zM14 7h6V4h-6z', null, 'Principal'],
+        ['Procès-verbaux', 'pvs.index', 'pvs.index|pvs.show|pvs.create|pvs.edit', 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6', null, 'Principal'],
+        ['Importer des résultats', 'pvs.import', 'pvs.import', 'M12 16V4m0 0l-4 4m4-4l4 4M4 20h16', ['administrateur', 'agent_scolarite'], 'Principal'],
+        ['Étudiants', 'etudiants.index', 'etudiants.*', 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0', null, 'Principal'],
+        ['Référentiels', 'referentiels.index', 'referentiels.*', 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5', ['administrateur'], 'Administration'],
+        ['Utilisateurs', 'utilisateurs.index', 'utilisateurs.*', 'M16 11a3 3 0 100-6 3 3 0 000 6zM8 12a3 3 0 100-6 3 3 0 000 6zM2 20a6 6 0 0112 0M14 20a6 6 0 018 0', ['administrateur'], 'Administration'],
+        ['Journal', 'journal.index', 'journal.*', 'M12 7v5l3 2M12 21a9 9 0 100-18 9 9 0 000 18z', ['administrateur'], 'Administration'],
     ];
-    $initiales = collect(explode(' ', $u->name))->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('');
+    $groupe = null;
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -18,59 +19,75 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>ENEAM · Gestion des PV</title>
-    <link rel="icon" href="{{ asset('images/logo-eneam.png') }}">
+    <title>{{ config('app.name', 'Gestion des PV') }}</title>
+    @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="bg-page font-sans text-ink antialiased" x-data="{ open: false }">
+<body class="bg-slate-100 font-sans text-slate-800 antialiased" x-data="{ open: false }">
+    <div class="flex min-h-screen">
 
-    {{-- Sidebar --}}
-    <div x-show="open" x-cloak @click="open = false" class="fixed inset-0 z-30 bg-ink/40 lg:hidden"></div>
-    <aside :class="open ? 'translate-x-0' : '-translate-x-full'"
-        class="fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-line bg-surface transition-transform lg:translate-x-0">
-        <a href="{{ route('dashboard') }}" class="flex h-16 items-center gap-3 px-5">
-            <img src="{{ asset('images/logo-eneam.png') }}" alt="ENEAM" class="h-10 w-auto">
-            <span class="leading-tight"><b class="block tracking-wide">ENEAM</b><span class="text-[11px] text-muted">Gestion des PV</span></span>
-        </a>
-        <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-            @foreach ($menu as [$label, $route, $actif, $roles, $icon])
-                @if ($roles === null || $u->isRole(...$roles))
-                    @php $on = request()->routeIs($actif); @endphp
+        {{-- Menu latéral --}}
+        <aside :class="open ? 'translate-x-0' : '-translate-x-full'"
+            class="fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col bg-sidebar text-white transition md:static md:translate-x-0">
+            <div class="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+                @if (file_exists(public_path('images/logo-eneam.png')))
+                    <img src="{{ asset('images/logo-eneam.png') }}" alt="ENEAM" class="h-10 w-10 rounded bg-white object-contain p-0.5">
+                @endif
+                <div>
+                    <p class="text-lg font-bold leading-tight">ENEAM</p>
+                    <p class="text-xs text-white/60">Gestion des PV</p>
+                </div>
+            </div>
+            <div class="flex h-1"><span class="flex-1 bg-primary"></span><span class="flex-1 bg-accent"></span><span class="flex-1 bg-danger"></span><span class="flex-1 bg-info"></span></div>
+
+            <nav class="flex-1 space-y-1 overflow-y-auto p-3">
+                @foreach ($menu as [$label, $route, $actif, $icone, $roles, $grp])
+                    @continue($roles && ! $u->isRole(...$roles))
+                    @if ($grp !== $groupe)
+                        <p class="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-white/40">{{ $grp }}</p>
+                        @php $groupe = $grp; @endphp
+                    @endif
                     <a href="{{ route($route) }}"
-                        class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $on ? 'bg-primary/10 text-primary' : 'text-ink hover:bg-page' }}">
-                        <svg class="h-5 w-5 {{ $on ? 'text-primary' : 'text-muted' }}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon }}" /></svg>
+                        class="flex items-center gap-3 rounded-lg border-l-4 px-3 py-2 text-sm font-medium transition
+                        {{ request()->routeIs(...explode('|', $actif)) ? 'border-accent bg-white/10 text-white' : 'border-transparent text-white/70 hover:bg-white/5 hover:text-white' }}">
+                        <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="{{ $icone }}" /></svg>
                         {{ $label }}
                     </a>
-                @endif
-            @endforeach
-        </nav>
-        <form method="POST" action="{{ route('logout') }}" class="border-t border-line p-3">
-            @csrf
-            <button class="w-full rounded-lg px-3 py-2.5 text-left text-sm text-muted hover:bg-page hover:text-ink">Déconnexion</button>
-        </form>
-    </aside>
+                @endforeach
+            </nav>
+        </aside>
 
-    {{-- Contenu --}}
-    <div class="flex min-h-screen flex-col lg:ml-60">
-        <header class="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line bg-surface px-4 sm:px-6">
-            <button @click="open = true" class="text-muted lg:hidden" aria-label="Menu">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
-            </button>
-            <h1 class="text-lg font-semibold">{{ $header ?? '' }}</h1>
-            <div class="ml-auto flex items-center gap-3">
-                <span class="grid h-10 w-10 place-items-center rounded-full bg-primary text-sm font-semibold text-white">{{ $initiales }}</span>
-                <span class="hidden leading-tight sm:block">
-                    <span class="block text-sm font-semibold">{{ $u->name }}</span>
-                    <span class="block text-xs text-muted">{{ ucfirst(str_replace('_', ' ', $u->role?->libelle ?? '')) }}</span>
-                </span>
-            </div>
-        </header>
+        <div x-show="open" x-cloak @click="open = false" class="fixed inset-0 z-30 bg-black/40 md:hidden"></div>
 
-        <main class="flex-1 p-4 sm:p-6">
-            <x-flash />
-            {{ $slot }}
-        </main>
+        <div class="flex min-w-0 flex-1 flex-col">
+            <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:px-8">
+                <div class="flex items-center gap-3">
+                    <button @click="open = true" class="rounded p-1 text-slate-600 md:hidden" aria-label="Menu">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+                    <h1 class="text-lg font-semibold">{{ $header ?? '' }}</h1>
+                </div>
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary-dark">
+                        {{ mb_strtoupper(mb_substr($u->name, 0, 1)) }}
+                    </span>
+                    <span class="hidden text-right leading-tight sm:block">
+                        <span class="block font-medium">{{ $u->name }}</span>
+                        <span class="block text-xs capitalize text-slate-500">{{ str_replace('_', ' ', $u->role?->libelle) }}</span>
+                    </span>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button class="rounded-lg border border-slate-300 px-3 py-1.5 text-slate-600 hover:bg-slate-50">Déconnexion</button>
+                    </form>
+                </div>
+            </header>
+
+            <main class="flex-1 p-4 md:p-8">
+                <x-flash />
+                {{ $slot }}
+            </main>
+        </div>
     </div>
 </body>
 

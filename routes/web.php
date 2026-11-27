@@ -10,9 +10,7 @@ use App\Http\Controllers\UtilisateurController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::redirect('/', '/dashboard');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', fn () => view('auth.login'))->name('login');
@@ -25,7 +23,7 @@ Route::middleware('auth')->group(function () {
         request()->session()->invalidate();
         request()->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect()->route('login');
     })->name('logout');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
